@@ -1,17 +1,17 @@
-# Prompt the user for the MITRE ATT&CK technique ID
-$techniqueID = Read-Host "Enter the MITRE ATT&CK technique ID"
+# Prompt the user for a Mitre ATT&CK technique ID
+$techniqueID = Read-Host "Enter Mitre ATT&CK Technique ID"
 
-# Build the URL for the MITRE ATT&CK API
-$url = "https://attack.mitre.org/api/v1/techniques/$techniqueID/"
+# Construct the API URL for retrieving the data components for the specified technique ID
+$url = "https://mitre-attack.github.io/attack-navigator/enterprise-layer/techniques/" + $techniqueID + ".json"
 
-# Make a GET request to the MITRE ATT&CK API
-$response = Invoke-RestMethod $url
+# Invoke the API to retrieve the data components for the specified technique ID
+$data = Invoke-RestMethod $url
 
-# Extract the data components from the response
-$dataComponents = $response.datasources | Select-Object -ExpandProperty name
+# Extract the data components from the retrieved JSON data
+$dataComponents = $data."x_mitre_data_components"
 
 # Output the data components
-Write-Host "Data Components for $techniqueID:`n"
+Write-Output "Data Components for Technique $techniqueID:`n"
 foreach ($component in $dataComponents) {
-    Write-Host "- $component"
+    Write-Output $component
 }
