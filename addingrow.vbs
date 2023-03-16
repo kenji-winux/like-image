@@ -7,7 +7,7 @@ Set objExcel = CreateObject("Excel.Application")
 Set objWorkbook = objExcel.Workbooks.Open("C:\path\to\your\file.xlsx")
 Set objWorksheet = objWorkbook.Worksheets(1)
 
-lastRow = objWorksheet.Cells(Rows.Count, "A").End(-4162).Row ' -4162 is equivalent to xlUp constant
+lastRow = objWorksheet.Cells(objWorksheet.Rows.Count, "A").End(-4162).Row ' -4162 is equivalent to xlUp constant
 
 For i = 1 To lastRow
     mergeStart = ""
