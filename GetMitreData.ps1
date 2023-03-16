@@ -1,15 +1,17 @@
-# Replace the list of technique IDs with your own list
-$techniqueIds = @('T1003', 'T1053', 'T1134')
+# Prompt the user for the MITRE ATT&CK technique ID
+$techniqueID = Read-Host "Enter the MITRE ATT&CK technique ID"
 
-foreach ($techniqueId in $techniqueIds) {
-    # Send a GET request to the MITRE ATT&CK website for the specified technique ID
-    $response = Invoke-WebRequest -Uri "https://attack.mitre.org/techniques/$techniqueId/"
+# Build the URL for the MITRE ATT&CK API
+$url = "https://attack.mitre.org/api/v1/techniques/$techniqueID/"
 
-    # Extract the Detection table from the HTML content of the response
-    $table = $response.Content | Select-Xml -XPath "//section[@id='Detection']//table" | Select-Object -ExpandProperty Node
+# Make a GET request to the MITRE ATT&CK API
+$response = Invoke-RestMethod $url
 
-    # Output the table to the console
-    Write-Host "Detection table for $techniqueId:"
-    Write-Host $table.OuterHtml
-    Write-Host "`n"
+# Extract the data components from the response
+$dataComponents = $response.datasources | Select-Object -ExpandProperty name
+
+# Output the data components
+Write-Host "Data Components for $techniqueID:`n"
+foreach ($component in $dataComponents) {
+    Write-Host "- $component"
 }
