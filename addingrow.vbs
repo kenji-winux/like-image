@@ -2,9 +2,12 @@ Option Explicit
 
 Dim objExcel, objWorkbook, objWorksheet
 Dim lastRow, i, j, mergeStart, mergeEnd, currentCell, currentCellVal
+Dim filePath
+
+filePath = InputBox("Please enter the path to the Excel file:")
 
 Set objExcel = CreateObject("Excel.Application")
-Set objWorkbook = objExcel.Workbooks.Open("C:\path\to\your\file.xlsx")
+Set objWorkbook = objExcel.Workbooks.Open(filePath)
 Set objWorksheet = objWorkbook.Worksheets(1)
 
 lastRow = objWorksheet.Cells(objWorksheet.Rows.Count, "A").End(-4162).Row ' -4162 is equivalent to xlUp constant
