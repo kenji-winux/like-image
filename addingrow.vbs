@@ -1,42 +1,34 @@
-Option Explicit
-
-Dim objExcel, objWorkbook, objWorksheet
-Dim lastRow, i, j, mergeStart, mergeEnd, currentCell, currentCellVal
-Dim filePath
-
-filePath = InputBox("Please enter the path to the Excel file:")
-
-Set objExcel = CreateObject("Excel.Application")
-Set objWorkbook = objExcel.Workbooks.Open(filePath)
-Set objWorksheet = objWorkbook.Worksheets(1)
-
-lastRow = objWorksheet.Cells(objWorksheet.Rows.Count, "A").End(-4162).Row ' -4162 is equivalent to xlUp constant
-
-For i = 1 To lastRow
-    mergeStart = ""
-    mergeEnd = ""
-    For j = 1 To 7 ' Merge from column A to column G
-        currentCell = objWorksheet.Cells(i, j)
-        currentCellVal = Trim(currentCell.Value)
-        If currentCellVal = "" And mergeStart = "" Then ' No value found, start of merge
-            mergeStart = objWorksheet.Cells(i, 1)
-        ElseIf currentCellVal <> "" And mergeStart <> "" Then ' Value found, end of merge
-            mergeEnd = objWorksheet.Cells(i, j - 1)
-            objWorksheet.Range(mergeStart, mergeEnd).Merge
-            mergeStart = ""
-            mergeEnd = ""
+Sub MergeCells()
+    Dim lastRow As Long
+    Dim i As Long
+    Dim j As Long
+    Dim mergeStart As Range
+    Dim mergeEnd As Range
+    Dim currentCell As Range
+    Dim currentCellVal As String
+    
+    lastRow = Cells(Rows.Count, 1).End(xlUp).Row
+    
+    For i = 1 To lastRow
+        Set mergeStart = Nothing
+        Set mergeEnd = Nothing
+        For j = 1 To 7 ' Merge from column A to column G
+            Set currentCell = Cells(i, j)
+            currentCellVal = Trim(currentCell.Value)
+            If currentCellVal <> "" And mergeStart Is Nothing Then ' Value found, start of merge
+                Set mergeStart = Cells(i, j)
+            ElseIf currentCellVal = "" And Not mergeStart Is Nothing And mergeEnd Is Nothing Then ' No value found, end of merge
+                Set mergeEnd = Cells(i, j - 1)
+                Range(mergeStart, mergeEnd).Merge
+                Set mergeStart = Nothing
+                Set mergeEnd = Nothing
+            End If
+        Next
+        If Not mergeStart Is Nothing And mergeEnd Is Nothing Then ' Merge until the end of the row
+            Set mergeEnd = Cells(i, 7)
+            Range(mergeStart, mergeEnd).Merge
+            Set mergeStart = Nothing
+            Set mergeEnd = Nothing
         End If
     Next
-    If mergeStart <> "" And mergeEnd = "" Then ' Merge until the end of the row
-        mergeEnd = objWorksheet.Cells(i, 7)
-        objWorksheet.Range(mergeStart, mergeEnd).Merge
-    End If
-Next
-
-objWorkbook.Save
-objWorkbook.Close
-objExcel.Quit
-
-Set objWorksheet = Nothing
-Set objWorkbook = Nothing
-Set objExcel = Nothing
+End Sub
