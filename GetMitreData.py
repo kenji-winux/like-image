@@ -22,6 +22,6 @@ if table is not None:
     for row in table.find_all('tr'):
         cells = row.find_all('td')
         if len(cells) >= 3:
-            print(cells[1].text, cells[2].text)
+            print(cells[1].text + '/' + cells[2].text)
 else:
     print('Table not found on the page.')
