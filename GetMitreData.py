@@ -1,3 +1,22 @@
+import requests
+
+# List of MITRE ATT&CK technique IDs
+technique_ids = ["T1003", "T1004", "T1005"]
+
+# Loop through each technique ID
+for technique_id in technique_ids:
+    # Construct URL for technique page
+    url = f"https://attack.mitre.org/techniques/{technique_id}/"
+
+    # Send request to website and get response
+    response = requests.get(url)
+
+    # Print HTML content to screen
+    print(response.content)
+
+
+
+
 import openpyxl
 import re
 
