@@ -1,83 +1,24 @@
 import requests
+import pandas as pd
+import openpyxl
+import pyperclip
+from bs4 import BeautifulSoup
 
-# List of MITRE ATT&CK technique IDs
-technique_ids = ["T1003", "T1004", "T1005"]
-
-# Loop through each technique ID
-for technique_id in technique_ids:
-    # Construct URL for technique page
+while True:
+    technique_id = input("Enter a MITRE ATT&CK technique ID (e.g., T1059): ")
+    if technique_id == "T000":
+        break
     url = f"https://attack.mitre.org/techniques/{technique_id}/"
-
-    # Send request to website and get response
     response = requests.get(url)
-
-    # Print HTML content to screen
-    print(response.content)
-
-
-
-import openpyxl
-import re
-
-# Specify the path to the Excel file
-file_path = 'path/to/excel_file.xlsx'
-
-# Load the workbook
-workbook = openpyxl.load_workbook(file_path)
-
-# Select the worksheet you want to extract data from
-worksheet = workbook.active
-
-# Define a list to hold the technique and sub-technique IDs found
-technique_ids = []
-
-# Define the regular expression pattern to match MITRE technique and sub-technique IDs
-pattern = r'(T\d{4})\.(\d{1,2})'
-
-# Loop through each cell in the worksheet
-for row in worksheet.iter_rows(min_row=1, min_col=1, max_col=worksheet.max_column, values_only=True):
-    for cell in row:
-        if cell is not None:
-            # Extract the sub-technique ID from the cell using the regex pattern
-            match = re.search(pattern, cell)
-            if match:
-                technique_ids.append(match.group(0))
-
-# Print the list of technique and sub-technique IDs
-print(technique_ids)
-
-
-
-
-
-import openpyxl
-import re
-
-# Specify the path to the Excel file
-file_path = 'path/to/excel_file.xlsx'
-
-# Load the workbook
-workbook = openpyxl.load_workbook(file_path)
-
-# Select the worksheet you want to extract data from
-worksheet = workbook.active
-
-# Define a set to hold the unique MITRE technique IDs found
-technique_ids = set()
-
-# Define the regular expression pattern to match MITRE technique IDs
-pattern = r'T\d{4}'
-
-# Loop through each row in column C, starting from the second row
-for row in worksheet.iter_rows(min_row=2, min_col=3, max_col=3):
-    cell = row[0]
-    if cell.value is not None:  # Skip over empty cells
-        # Extract all the MITRE technique IDs from the cell using the regex pattern
-        matches = re.findall(pattern, cell.value)
-        # Add the technique IDs to the set
-        technique_ids.update(matches)
-
-# Print the list of technique IDs
-print(list(technique_ids))
-
-
+    soup = BeautifulSoup(response.content, 'html.parser')
+    table = soup.find('table', {'class': 'table table-bordered table-hover table-condensed'})
+    if table:
+        df = pd.read_html(str(table))[0].iloc[:, 1:3]
+        filename = f"{technique_id}.xlsx"
+        with pd.ExcelWriter(filename, mode='w', engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, header=False)
+            writer.save()
+        pyperclip.copy(df.to_string(index=False, header=False))
+        print(f"Data for {technique_id} has been copied to the clipboard and saved to {filename}.")
+    else:
+        print(f"No data found for {technique_id}.")
