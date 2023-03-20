@@ -1,0 +1,19 @@
+Sub SplitCells()
+    Dim rng As Range
+    Dim cell As Range
+    Dim str() As String
+    Dim i As Long
+    
+    Set rng = Selection ' Select the column that contains the data you want to split
+    
+    For Each cell In rng.Cells ' Loop through each cell in the selected column
+        If InStr(1, cell.Value, "/", vbTextCompare) > 0 Then ' Check if the cell contains "/"
+            str = Split(cell.Value, "/") ' Split the cell into two parts using "/"
+            cell.Value = Trim(str(0)) ' Remove any leading/trailing spaces from the first part
+            If UBound(str) > 0 Then ' Check if the cell contains more than one "/"
+                cell.Offset(0, 1).Insert xlShiftToRight ' Move the contents of the next cell to the right
+                cell.Offset(0, 1).Value = Trim(str(1)) ' Remove any leading/trailing spaces from the second part and paste it into the next cell
+            End If
+        End If
+    Next cell
+End Sub
