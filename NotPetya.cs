@@ -181,3 +181,35 @@ static extern bool CryptReleaseContext(IntPtr hProv, uint dwFlags);
 [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
 static extern bool CryptDestroyKey(IntPtr hKey);
 }
+
+
+
+using System.IO;
+
+class Program
+{
+    static void Main()
+    {
+        string filePath = @"C:\README.txt";
+        string content = "Success";
+
+        try
+        {
+            // Write the content to the file
+            File.WriteAllText(filePath, content);
+            Console.WriteLine("README.txt file created successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("An error occurred: " + ex.Message);
+        }
+    }
+}
+
+
+
+
+
+
+
+
