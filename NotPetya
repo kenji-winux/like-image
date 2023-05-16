@@ -87,4 +87,11 @@ public class FileEncryption
     }
 
     private static IntPtr CreateFileMapping(IntPtr fileHandle, long fileSize)
+    
+    // Create README.txt with content "done"
+        string readmeFile = @"C:\README.txt";
+        using (StreamWriter writer = new StreamWriter(readmeFile))
+        {
+            writer.WriteLine("done");
+        }
    
