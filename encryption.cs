@@ -168,7 +168,20 @@ private static void EncryptData(ref byte[] data)
         aes.KeySize = AES_KEY_SIZE;
         aes.GenerateKey();
 
-        byte[] encryptedKey = rsa.Encrypt(aes.Key, true);
+        byte[] encryptedKey;
+
+        try
+        {
+            rsa.ImportParameters(rsa.ExportParameters(true));
+            encryptedKey = rsa.Encrypt(aes.Key, true);
+        }
+        catch (CryptographicException)
+        {
+            rsa.PersistKeyInCsp = false;
+            rsa.Clear();
+            rsa.GenerateKey();
+            encryptedKey = rsa.Encrypt(aes.Key, true);
+        }
 
         IntPtr hCryptProv = IntPtr.Zero;
         IntPtr hKey = IntPtr.Zero;
@@ -179,7 +192,7 @@ private static void EncryptData(ref byte[] data)
             {
                 if (Marshal.GetLastWin32Error() == 0x80090016) // NTE_BAD_KEYSET
                 {
-                    if (!CryptAcquireContext(ref hCryptProv, containerName, null, 1, CspProviderFlags.CreateNewKeyset))
+                    if (!CryptAcquireContext(ref hCryptProv, containerName, null, 1, 8)) // CRYPT_NEWKEYSET
                     {
                         throw new CryptographicException(Marshal.GetLastWin32Error());
                     }
@@ -220,4 +233,5 @@ private static void EncryptData(ref byte[] data)
         }
     }
 }
+
 
