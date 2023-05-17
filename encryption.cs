@@ -154,7 +154,7 @@ private static void EncryptFileContents(string filePath)
 
 private static void EncryptData(ref byte[] data)
 {
-    string aesKey = ConfigurationManager.AppSettings["AesKey"];
+    string aesKey = Configuration["AesKey"];
 
     if (string.IsNullOrEmpty(aesKey))
     {
@@ -164,10 +164,7 @@ private static void EncryptData(ref byte[] data)
             aes.GenerateKey();
 
             aesKey = Convert.ToBase64String(aes.Key);
-            Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-            config.AppSettings.Settings.Add("AesKey", aesKey);
-            config.Save(ConfigurationSaveMode.Modified);
-            ConfigurationManager.RefreshSection("appSettings");
+            Configuration["AesKey"] = aesKey;
         }
     }
 
