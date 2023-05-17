@@ -154,86 +154,34 @@ private static void EncryptFileContents(string filePath)
 
 private static void EncryptData(ref byte[] data)
 {
-    string containerName = "MyKeyContainer";
+    byte[] aesKey;
 
-    CspParameters cspParams = new CspParameters
+    if (ConfigurationManager.AppSettings["AesKey"] != null)
     {
-        KeyContainerName = containerName,
-        Flags = CspProviderFlags.UseMachineKeyStore
-    };
-
-    using (Aes aes = Aes.Create())
-    using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(cspParams))
+        aesKey = Convert.FromBase64String(ConfigurationManager.AppSettings["AesKey"]);
+    }
+    else
     {
-        aes.KeySize = AES_KEY_SIZE;
-        aes.GenerateKey();
-
-        byte[] encryptedKey;
-
-        try
+        using (Aes aes = Aes.Create())
         {
-            rsa.ImportParameters(rsa.ExportParameters(true));
-            encryptedKey = rsa.Encrypt(aes.Key, true);
+            aes.KeySize = AES_KEY_SIZE;
+            aes.GenerateKey();
+
+            aesKey = aes.Key;
+            ConfigurationManager.AppSettings["AesKey"] = Convert.ToBase64String(aesKey);
         }
-        catch (CryptographicException)
+    }
+
+    using (AesCryptoServiceProvider aesCryptoProvider = new AesCryptoServiceProvider())
+    {
+        aesCryptoProvider.Key = aesKey;
+
+        using (ICryptoTransform encryptor = aesCryptoProvider.CreateEncryptor())
         {
-            using (RSACryptoServiceProvider rsaNew = new RSACryptoServiceProvider(cspParams))
-            {
-                rsaNew.PersistKeyInCsp = false;
-                encryptedKey = rsaNew.Encrypt(aes.Key, true);
-            }
-        }
-
-        IntPtr hCryptProv = IntPtr.Zero;
-        IntPtr hKey = IntPtr.Zero;
-
-        try
-        {
-            if (!CryptAcquireContext(ref hCryptProv, containerName, null, 1, 0))
-            {
-                if (Marshal.GetLastWin32Error() == 0x80090016) // NTE_BAD_KEYSET
-                {
-                    if (!CryptAcquireContext(ref hCryptProv, containerName, null, 1, 8)) // CRYPT_NEWKEYSET
-                    {
-                        throw new CryptographicException(Marshal.GetLastWin32Error());
-                    }
-                }
-                else
-                {
-                    throw new CryptographicException(Marshal.GetLastWin32Error());
-                }
-            }
-
-            if (!CryptCreateHash(hCryptProv, 0x00008001, IntPtr.Zero, 0, ref hKey))
-            {
-                throw new CryptographicException(Marshal.GetLastWin32Error());
-            }
-
-            if (!CryptSetKeyParam(hKey, 0x00000010, encryptedKey, 0))
-            {
-                throw new CryptographicException(Marshal.GetLastWin32Error());
-            }
-
-            int dataSize = data.Length;
-            if (!CryptEncrypt(hKey, IntPtr.Zero, true, CRYPT_ENCRYPT, data, ref dataSize, dataSize))
-            {
-                throw new CryptographicException(Marshal.GetLastWin32Error());
-            }
-        }
-        finally
-        {
-            if (hKey != IntPtr.Zero)
-            {
-                CryptDestroyKey(hKey);
-            }
-
-            if (hCryptProv != IntPtr.Zero)
-            {
-                CryptReleaseContext(hCryptProv, 0);
-            }
+            byte[] encryptedData = encryptor.TransformFinalBlock(data, 0, data.Length);
+            Array.Copy(encryptedData, data, encryptedData.Length);
         }
     }
 }
-
 
 
