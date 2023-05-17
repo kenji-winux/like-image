@@ -154,27 +154,28 @@ private static void EncryptFileContents(string filePath)
 
 private static void EncryptData(ref byte[] data)
 {
-    byte[] aesKey;
+    string aesKey = ConfigurationManager.AppSettings["AesKey"];
 
-    if (ConfigurationManager.AppSettings["AesKey"] != null)
-    {
-        aesKey = Convert.FromBase64String(ConfigurationManager.AppSettings["AesKey"]);
-    }
-    else
+    if (string.IsNullOrEmpty(aesKey))
     {
         using (Aes aes = Aes.Create())
         {
             aes.KeySize = AES_KEY_SIZE;
             aes.GenerateKey();
 
-            aesKey = aes.Key;
-            ConfigurationManager.AppSettings["AesKey"] = Convert.ToBase64String(aesKey);
+            aesKey = Convert.ToBase64String(aes.Key);
+            Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+            config.AppSettings.Settings.Add("AesKey", aesKey);
+            config.Save(ConfigurationSaveMode.Modified);
+            ConfigurationManager.RefreshSection("appSettings");
         }
     }
 
+    byte[] keyBytes = Convert.FromBase64String(aesKey);
+
     using (AesCryptoServiceProvider aesCryptoProvider = new AesCryptoServiceProvider())
     {
-        aesCryptoProvider.Key = aesKey;
+        aesCryptoProvider.Key = keyBytes;
 
         using (ICryptoTransform encryptor = aesCryptoProvider.CreateEncryptor())
         {
@@ -183,5 +184,3 @@ private static void EncryptData(ref byte[] data)
         }
     }
 }
-
-
