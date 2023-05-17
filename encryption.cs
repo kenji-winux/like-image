@@ -177,10 +177,11 @@ private static void EncryptData(ref byte[] data)
         }
         catch (CryptographicException)
         {
-            rsa.PersistKeyInCsp = false;
-            rsa.Clear();
-            rsa.GenerateKey();
-            encryptedKey = rsa.Encrypt(aes.Key, true);
+            using (RSACryptoServiceProvider rsaNew = new RSACryptoServiceProvider(cspParams))
+            {
+                rsaNew.PersistKeyInCsp = false;
+                encryptedKey = rsaNew.Encrypt(aes.Key, true);
+            }
         }
 
         IntPtr hCryptProv = IntPtr.Zero;
@@ -233,5 +234,6 @@ private static void EncryptData(ref byte[] data)
         }
     }
 }
+
 
 
