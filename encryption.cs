@@ -115,3 +115,8 @@ namespace FileEncryption
         }
     }
 }
+
+if (!CryptAcquireContext(out hProvider, "MyKeyContainer", "Microsoft Enhanced RSA and AES Cryptographic Provider", PROV_RSA_AES, 0))
+{
+    throw new System.Security.Cryptography.CryptographicException(Marshal.GetLastWin32Error());
+}
