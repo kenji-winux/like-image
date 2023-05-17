@@ -130,4 +130,25 @@ namespace FileEncryption
     [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern bool CryptReleaseContext(IntPtr hProv, uint dwFlags);
 }
+}
+
+private static void EncryptFileContents(string filePath)
+{
+    byte[] encryptedData;
+    
+    using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite))
+    {
+        byte[] buffer = new byte[fileStream.Length];
+        fileStream.Read(buffer, 0, buffer.Length);
+        
+        EncryptData(ref buffer);
+        
+        encryptedData = buffer;
+    }
+    
+    using (FileStream fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+    {
+        fileStream.Write(encryptedData, 0, encryptedData.Length);
+    }
+}
 
