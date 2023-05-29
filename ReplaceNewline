@@ -1,0 +1,32 @@
+Sub ReplaceNewlineWithSemicolon()
+    Dim selectedColumn As Range
+    Dim cell As Range
+    
+    ' Prompt user to select the target column
+    On Error Resume Next
+    Set selectedColumn = Application.InputBox("Select the target column", Type:=8)
+    On Error GoTo 0
+    
+    ' Check if a valid column is selected
+    If selectedColumn Is Nothing Then
+        MsgBox "No column selected. Macro terminated.", vbExclamation
+        Exit Sub
+    End If
+    
+    ' Disable screen updating for faster execution
+    Application.ScreenUpdating = False
+    
+    ' Loop through each cell in the selected column
+    For Each cell In selectedColumn
+        ' Check if the cell contains any newline characters
+        If InStr(1, cell.Value, vbLf) > 0 Then
+            ' Replace newline characters with semicolon
+            cell.Value = Replace(cell.Value, vbLf, ";")
+        End If
+    Next cell
+    
+    ' Enable screen updating
+    Application.ScreenUpdating = True
+    
+    MsgBox "Newline characters replaced with semicolon.", vbInformation
+End Sub
