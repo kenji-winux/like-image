@@ -1,25 +1,25 @@
+
 Sub RemoveDuplicateLines()
     Dim lastRow As Long
     Dim i As Long
     
-    ' Define the worksheet and range
+    ' Define the current worksheet
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Sheets("Sheet1") ' Replace "Sheet1" with your sheet name
-    Dim tableRange As Range
-    Set tableRange = ws.Range("A1:B" & ws.Cells(ws.Rows.Count, 1).End(xlUp).Row)
+    Set ws = ActiveSheet
     
-    lastRow = tableRange.Rows.Count
+    lastRow = ws.Cells(ws.Rows.Count, 2).End(xlUp).Row
     
     ' Loop through each row in the range from bottom to top
     For i = lastRow To 2 Step -1
-        ' Check if the values in column A and B match the first row
-        If tableRange.Cells(i, 1).Value = tableRange.Cells(1, 1).Value And _
-           tableRange.Cells(i, 2).Value = tableRange.Cells(1, 2).Value Then
+        ' Check if the values in column B and D match the first row
+        If ws.Cells(i, 2).Value = ws.Cells(1, 2).Value And _
+           ws.Cells(i, 4).Value = ws.Cells(1, 4).Value Then
             ' Delete the duplicate row
-            tableRange.Rows(i).Delete
+            ws.Rows(i).Delete
         End If
     Next i
     
     ' Clear the filter and remove any remaining duplicates
-    tableRange.RemoveDuplicates Columns:=Array(1, 2), Header:=xlYes
+    ws.Range("B1:D" & lastRow).RemoveDuplicates Columns:=Array(1, 3), Header:=xlYes
 End Sub
+
